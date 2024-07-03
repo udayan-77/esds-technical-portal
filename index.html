@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESDS Portal - Spreadsheet</title>
+    <!-- Handsontable CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #spreadsheet-container {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        #spreadsheet {
+            flex: 1;
+        }
+        .logo-top-right {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 100px;
+            z-index: 10;
+            background-color: white;
+            border-radius: 5px;
+            padding: 5px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+        .logo-bottom-center {
+            display: block;
+            width: 80px;
+            margin: 10px auto;
+            transition: width 0.2s;
+        }
+        .bottom-text {
+            color: #0033cc;
+            font-size: 12px;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        h2 {
+            text-align: center;
+            color: #0033cc;
+            background-color: #f2f2f2;
+            padding: 10px;
+            margin: 0;
+            border-bottom: 2px solid #0033cc;
+        }
+        .tabs {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 5px 0;
+            flex-wrap: wrap;
+        }
+        .tabs input {
+            padding: 5px;
+            font-size: 14px;
+            margin-right: 5px;
+        }
+        .tabs button {
+            padding: 5px 10px;
+            margin: 0 3px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .tab-button.active {
+            background-color: #0033cc;
+            color: white;
+        }
+        .tab-button.editing {
+            display: none;
+        }
+        .tab-input {
+            padding: 5px;
+            font-size: 14px;
+            margin: 0 3px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<img src="esds_logo.png" alt="ESDS Logo" class="logo-top-right">
+
+<h2>Host Reboot Incidents</h2>
+<div id="spreadsheet-container">
+    <div id="spreadsheet"></div>
+    <div class="tabs">
+        <input type="text" id="new-sheet-name" placeholder="New sheet name">
+        <button id="add-sheet-button">Add New Sheet</button>
+    </div>
+    <div class="tabs" id="sheet-tabs">
+        <button class="tab-button active" data-sheet="Sheet1">Sheet 1</button>
+        <button class="tab-button" data-sheet="Sheet2">Sheet 2</button>
+    </div>
+    <div class="bottom-text">ESDS Technical Team</div>
+    <img src="esds_logo.png" alt="ESDS Logo" class="logo-bottom-center" id="bottom-logo">
+</div>
+
+<!-- Handsontable JS -->
+<script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+<!-- Hammer.js for touch gestures -->
+<script src="https://cdn.jsdelivr.net/npm/hammerjs"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const sheets = {
+            'Sheet1': [
+                ['', 'Serial Number', 'Client ID', 'VM Name', 'Host Reboot Details', 'RCA Details'],
+                ['', '', '', '', '', ''],
+                ['', '', '', '', '', ''],
+                ['', '', '', '', '', '']
+            ],
+            'Sheet2': [
+                ['', 'Serial Number', 'Client ID', 'VM Name', 'Host Reboot Details', 'RCA Details'],
+                ['', '', '', '', '', ''],
+                ['', '', '', '', '', ''],
+                ['', '', '', '', '', '']
+            ]
+        };
+
+        let currentSheet = 'Sheet1';
+
+        const container = document.getElementById('spreadsheet');
+        const hot = new Handsontable(container, {
+            data: sheets[currentSheet],
+            rowHeaders: true,
+            colHeaders: ['Serial Number', 'Client ID', 'VM Name', 'Host Reboot Details', 'RCA Details'],
+            columns: [
+                {data: 0, type: 'text'},
+                {data: 1, type: 'text'},
+                {data: 2, type: 'text'},
+                {data: 3, type: 'text'},
+                {data: 4, type: 'text'}
+            ],
+            contextMenu: true,
+            manualRowResize: true,
+            manualColumnResize: true,
+            width: '100%',
+            height: '100%', // Adjust height to fit the container
+            colWidths: 300,
+            minSpareRows: 1,
+            minSpareCols: 1
+        });
+
+        const zoomContainer = document.getElementById('spreadsheet-container');
+        const bottomLogo = document.getElementById('bottom-logo');
+        let currentZoom = 1;
+
+        function setZoom(zoom) {
+            const zoomFactor = Math.pow(1.2, zoom - 1); // Change this factor to adjust zoom sensitivity
+            zoomContainer.style.transform = `scale(${zoomFactor})`;
+            zoomContainer.style.transformOrigin = '0 0';
+            hot.updateSettings({
+                width: `${100 / zoomFactor}%`,
+                height: `${100 / zoomFactor}%`
+            });
+            bottomLogo.style.width = `${80 / zoomFactor}px`;
+        }
+
+        const hammertime = new Hammer(zoomContainer);
+        hammertime.get('pinch').set({ enable: true });
+        hammertime.on('pinchmove', function(ev) {
+            currentZoom = ev.scale;
+            setZoom(currentZoom);
+        });
+
+        setZoom(currentZoom);
+
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', function() {
+                switchSheet(this.dataset.sheet);
+            });
+
+            button.addEventListener('dblclick', function() {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.classList.add('tab-input');
+                input.value = this.textContent;
+                input.dataset.sheet = this.dataset.sheet;
+                this.parentNode.insertBefore(input, this.nextSibling);
+                this.classList.add('editing');
+                input.style.display = 'inline-block';
+                input.focus();
+
+                input.addEventListener('blur', function() {
+                    renameSheet(this.dataset.sheet, this.value);
+                    this.remove();
+                });
+
+                input.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        renameSheet(this.dataset.sheet, this.value);
+                        this.remove();
+                    }
+                });
+            });
+        });
+
+        document.getElementById('add-sheet-button').addEventListener('click', function() {
+            const newSheetName = document.getElementById('new-sheet-name').value.trim();
+            if (newSheetName && !sheets[newSheetName]) {
+                sheets[newSheetName] = [
+                    ['', 'Serial Number', 'Client ID', 'VM Name', 'Host Reboot Details', 'RCA Details'],
+                    ['', '', '', '', '', ''],
+                    ['', '', '', '', '', ''],
+                    ['', '', '', '', '', '']
+                ];
+                addTab(newSheetName);
+                switchSheet(newSheetName);
+                document.getElementById('new-sheet-name').value = '';
+            }
+        });
+
+        function addTab(sheetName) {
+            const newButton = document.createElement('button');
+            newButton.classList.add('tab-button');
+            newButton.dataset.sheet = sheetName;
+            newButton.textContent = sheetName;
+            document.getElementById('sheet-tabs').appendChild(newButton);
+            newButton.addEventListener('click', function() {
+                switchSheet(sheetName);
+            });
+
+            newButton.addEventListener('dblclick', function() {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.classList.add('tab-input');
+                input.value = this.textContent;
+                input.dataset.sheet = this.dataset.sheet;
+                this.parentNode.insertBefore(input, this.nextSibling);
+                this.classList.add('editing');
+                input.style.display = 'inline-block';
+                input.focus();
+
+                input.addEventListener('blur', function() {
+                    renameSheet(this.dataset.sheet, this.value);
+                    this.remove();
+                });
+
+                input.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        renameSheet(this.dataset.sheet, this.value);
+                        this.remove();
+                    }
+                });
+            });
+        }
+
+        function switchSheet(sheetName) {
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+                if (button.dataset.sheet === sheetName) {
+                    button.classList.add('active');
+                }
+            });
+            currentSheet = sheetName;
+            hot.loadData(sheets[currentSheet]);
+        }
+
+        function renameSheet(oldName, newName) {
+            if (newName && !sheets[newName]) {
+                sheets[newName] = sheets[oldName];
+                delete sheets[oldName];
+                document.querySelectorAll('.tab-button').forEach(button => {
+                    if (button.dataset.sheet === oldName) {
+                        button.dataset.sheet = newName;
+                        button.textContent = newName;
+                        button.classList.remove('editing');
+                    }
+                });
+                if (currentSheet === oldName) {
+                    currentSheet = newName;
+                }
+            } else {
+                document.querySelectorAll('.tab-button').forEach(button => {
+                    if (button.dataset.sheet === oldName) {
+                        button.classList.remove('editing');
+                    }
+                });
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
